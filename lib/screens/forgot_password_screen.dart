@@ -14,16 +14,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isLoading = false;
 
   void _handleReset() async {
-    if (_emailController.text.isEmpty) {
+    final String email = _emailController.text.trim();
+
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Podaj adres email!')),
       );
       return;
     }
 
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Podaj poprawny adres email!')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    final success = await _authService.resetPassword(_emailController.text);
+    final success = await _authService.resetPassword(email);
 
     setState(() => _isLoading = false);
 
