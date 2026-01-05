@@ -35,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Błąd logowania.'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Nieprawidłowy email lub hasło.'), backgroundColor: Colors.red),
       );
     }
   }
