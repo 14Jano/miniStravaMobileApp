@@ -12,7 +12,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  final AuthService _authService = AuthService();
 
   final List<Widget> _screens = [
     const Center(child: Text('Tu będzie Mapa', style: TextStyle(fontSize: 24))),
