@@ -62,7 +62,7 @@ class AuthService {
 
         await _storage.write(key: 'auth_token', value: token);
         
-        print('Zalogowano! Token: $token');
+        print('Zalogowano pomyślnie.');
         return true;
       } else {
         print('Błąd logowania: ${response.body}');
