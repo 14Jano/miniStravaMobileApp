@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -37,7 +38,7 @@ class ActivityService {
       }
     } catch (e) {
       print('Błąd serwisu: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -49,38 +50,71 @@ class ActivityService {
     required int durationSeconds,
     required double distanceMeters,
     required List<LatLng> routePoints,
+    String? notes,
+    File? imageFile,
   }) async {
     final token = await _storage.read(key: 'auth_token');
     final url = Uri.parse('$_baseUrl/activities');
+    
     final routeJson = routePoints.map((point) => {
       'lat': point.latitude,
       'lng': point.longitude,
     }).toList();
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'title': title,
-          'type': type,
-          'start_time': startTime.toIso8601String(),
-          'end_time': endTime.toIso8601String(),
-          'duration_seconds': durationSeconds,
-          'distance_meters': distanceMeters,
-          'route': routeJson,
-        }),
-      );
+      if (imageFile == null) {
+        // --- Wersja bez zdjęcia (zwykły JSON) ---
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'title': title,
+            'type': type,
+            'start_time': startTime.toIso8601String(),
+            'end_time': endTime.toIso8601String(),
+            'duration_seconds': durationSeconds,
+            'distance_meters': distanceMeters,
+            'route': routeJson,
+            'notes': notes,
+          }),
+        );
+        return (response.statusCode == 200 || response.statusCode == 201);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Trening zapisany pomyślnie!');
-        return true;
       } else {
-        print('Błąd zapisywania: ${response.body}');
-        return false;
+        // --- Wersja ze zdjęciem (Multipart) ---
+        var request = http.MultipartRequest('POST', url);
+        request.headers['Authorization'] = 'Bearer $token';
+        
+        request.fields['title'] = title;
+        request.fields['type'] = type;
+        request.fields['start_time'] = startTime.toIso8601String();
+        request.fields['end_time'] = endTime.toIso8601String();
+        request.fields['duration_seconds'] = durationSeconds.toString();
+        request.fields['distance_meters'] = distanceMeters.toString();
+        if (notes != null) request.fields['notes'] = notes;
+        
+        // Ważne: Przesyłamy tablicę route jako string JSON,
+        // backend musi to obsłużyć (zdekodować) lub przyjąć w takiej formie.
+        request.fields['route'] = jsonEncode(routeJson);
+
+        request.files.add(await http.MultipartFile.fromPath(
+          'photo', // Nazwa pola pliku (może wymagać zmiany na 'image' lub 'file' w zależności od API)
+          imageFile.path,
+        ));
+
+        var streamedResponse = await request.send();
+        var response = await http.Response.fromStream(streamedResponse);
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          print('Trening ze zdjęciem zapisany!');
+          return true;
+        } else {
+          print('Błąd uploadu: ${response.body}');
+          return false;
+        }
       }
     } catch (e) {
       print('Błąd połączenia: $e');

@@ -17,26 +17,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final AuthService _authService = AuthService();
   bool _isLoading = false;
 
-  void _handleRegister() async {
-    setState(() => _isLoading = true);
-    final success = await _authService.register(
-      firstname: _firstnameController.text,
-      lastname: _lastnameController.text,
-      email: _emailController.text,
-      password: _passwordController.text,
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
     );
+  }
+
+  void _handleRegister() async {
+    final firstName = _firstnameController.text.trim();
+    final lastName = _lastnameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || password.isEmpty) {
+      _showErrorSnackBar('Wszystkie pola muszą być wypełnione!');
+      return;
+    }
+
+    if (!email.contains('@') || !email.contains('.')) {
+      _showErrorSnackBar('Podaj poprawny adres email.');
+      return;
+    }
+
+    if (password.length < 8) {
+      _showErrorSnackBar('Hasło musi mieć co najmniej 8 znaków.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final success = await _authService.register(
+      firstname: firstName,
+      lastname: lastName,
+      email: email,
+      password: password,
+    );
+    
     setState(() => _isLoading = false);
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Konto utworzone!'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Konto utworzone pomyślnie! Możesz się zalogować.'), 
+          backgroundColor: Colors.green
+        ),
       );
       Navigator.pop(context);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Błąd rejestracji.'), backgroundColor: Colors.red),
-      );
+      _showErrorSnackBar('Błąd rejestracji. Sprawdź dane lub spróbuj inny email.');
     }
+  }
+
+  @override
+  void dispose() {
+    _firstnameController.dispose();
+    _lastnameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -76,6 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 textCapitalization: TextCapitalization.sentences,
               ),
               const SizedBox(height: 16),
+              
               TextField(
                 controller: _lastnameController,
                 decoration: const InputDecoration(
@@ -99,7 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextField(
                 controller: _passwordController,
                 decoration: const InputDecoration(
-                  labelText: 'Hasło',
+                  labelText: 'Hasło (min. 8 znaków)',
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
                 obscureText: true,

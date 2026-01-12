@@ -11,6 +11,8 @@ class Activity {
   final double distanceMeters;
   
   final List<LatLng> routePoints;
+  final String? notes;
+  final String? photoUrl;
 
   Activity({
     required this.id,
@@ -21,17 +23,38 @@ class Activity {
     required this.durationSeconds,
     required this.distanceMeters,
     required this.routePoints,
+    this.notes,
+    this.photoUrl,
   });
 
   String get formattedDate => startTime.toString().substring(0, 16).replaceAll('T', ' ');
   
   String get formattedDuration {
-    final int minutes = (durationSeconds / 60).floor();
+    final int hours = durationSeconds ~/ 3600;
+    final int minutes = (durationSeconds % 3600) ~/ 60;
     final int remainingSeconds = durationSeconds % 60;
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m ${remainingSeconds}s';
+    }
     return '${minutes}m ${remainingSeconds}s';
   }
 
   double get distanceKm => distanceMeters / 1000;
+
+  String get formattedPace {
+    if (distanceMeters == 0) return '-:--';
+    
+    final double distKm = distanceMeters / 1000;
+    final double totalMinutes = (durationSeconds / 60);
+    
+    final double paceDecimal = totalMinutes / distKm;
+    
+    final int minutes = paceDecimal.floor();
+    final int seconds = ((paceDecimal - minutes) * 60).round();
+    
+    return '$minutes:${seconds.toString().padLeft(2, '0')} /km';
+  }
 
   factory Activity.fromJson(Map<String, dynamic> json) {
     List<LatLng> parseRoute(List<dynamic>? routeJson) {
@@ -69,6 +92,8 @@ class Activity {
       durationSeconds: parseInt(json['duration_seconds']),
       distanceMeters: meters,
       routePoints: parseRoute(json['route']),
+      notes: json['notes'],
+      photoUrl: json['photo_url'],
     );
   }
 }

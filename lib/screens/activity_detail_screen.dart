@@ -54,9 +54,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         );
       }
     } catch (e) {
-      print("Błąd zapisu/udostępniania: $e");
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Błąd zapisu pliku.")),
         );
       }
@@ -68,6 +67,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     super.initState();
     _activityFuture = _activityService.getActivityDetails(widget.activityId);
   }
+  
   void _editTitle(Activity activity) {
     final controller = TextEditingController(text: activity.title);
 
@@ -96,6 +96,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 durationSeconds: activity.durationSeconds,
                 distanceMeters: activity.distanceMeters,
                 routePoints: activity.routePoints,
+                notes: activity.notes,
+                photoUrl: activity.photoUrl,
               );
               final success = await _activityService.updateActivity(updatedActivity);
 
@@ -201,55 +203,56 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               ? activity.routePoints.first
               : const LatLng(52.237, 21.017);
 
-          return Column(
-            children: [
-              
-              SizedBox(
-                height: 300,
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: initialCenter,
-                    initialZoom: 14.0,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                
+                SizedBox(
+                  height: 300,
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: initialCenter,
+                      initialZoom: 14.0,
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                      ),
                     ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.ministrava',
+                      ),
+                      
+                      if (activity.routePoints.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: activity.routePoints,
+                              strokeWidth: 4.0,
+                              color: const Color(0xFFFC4C02),
+                            ),
+                          ],
+                        ),
+                      
+                      if (activity.routePoints.isNotEmpty)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: activity.routePoints.first,
+                              child: const Icon(Icons.location_on, color: Colors.green, size: 30),
+                            ),
+                            Marker(
+                              point: activity.routePoints.last,
+                              child: const Icon(Icons.flag, color: Colors.red, size: 30),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.ministrava',
-                    ),
-                    
-                    if (activity.routePoints.isNotEmpty)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: activity.routePoints,
-                            strokeWidth: 4.0,
-                            color: const Color(0xFFFC4C02),
-                          ),
-                        ],
-                      ),
-                    
-                    if (activity.routePoints.isNotEmpty)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: activity.routePoints.first,
-                            child: const Icon(Icons.location_on, color: Colors.green, size: 30),
-                          ),
-                          Marker(
-                            point: activity.routePoints.last,
-                            child: const Icon(Icons.flag, color: Colors.red, size: 30),
-                          ),
-                        ],
-                      ),
-                  ],
                 ),
-              ),
 
-              Expanded(
-                child: Padding(
+                Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,19 +263,70 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       ),
                       Text(activity.formattedDate, style: const TextStyle(color: Colors.grey)),
                       const SizedBox(height: 20),
+                      
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem("Dystans", "${activity.distanceKm} km"),
+                          _buildStatItem("Dystans", "${activity.distanceKm.toStringAsFixed(2)} km"),
                           _buildStatItem("Czas", activity.formattedDuration),
-                          _buildStatItem("Typ", activity.type.toUpperCase()),
+                          _buildStatItem("Tempo", activity.formattedPace),
                         ],
                       ),
+                      const SizedBox(height: 15),
+                      Center(child: _buildStatItem("Typ", activity.type.toUpperCase())),
+                      
+                      const Divider(height: 30),
+
+                      if (activity.notes != null && activity.notes!.isNotEmpty) ...[
+                        const Text(
+                          "Notatka",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Text(
+                            activity.notes!,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      if (activity.photoUrl != null && activity.photoUrl!.isNotEmpty) ...[
+                        const Text(
+                          "Zdjęcie",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            activity.photoUrl!,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 200,
+                                color: Colors.grey[200],
+                                child: const Center(child: Text("Błąd ładowania zdjęcia")),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
