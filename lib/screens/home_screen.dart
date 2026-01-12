@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import '../services/auth_service.dart';
 import 'map_screen.dart';
+import 'activity_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,12 +15,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const Center(child: Text('Tu będzie Mapa', style: TextStyle(fontSize: 24))),
-    
-    const Center(child: Text('Historia Treningów', style: TextStyle(fontSize: 24))),
-
     const MapScreen(),
-  
+    const ActivityListScreen(),
     const ProfilePlaceholder(),
   ];
 

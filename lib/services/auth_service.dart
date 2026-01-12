@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthService {
-  static const String _baseUrl = 'https://strava.host358482.xce.pl/api/';
+  static const String _baseUrl = 'https://strava.host358482.xce.pl/api';
 
   final _storage = const FlutterSecureStorage();
 
@@ -14,6 +14,7 @@ class AuthService {
     required String password,
   }) async {
     final url = Uri.parse('$_baseUrl/auth/register');
+    print('Rejestracja - wysyłam do: $url');
 
     try {
       final response = await http.post(
@@ -29,6 +30,8 @@ class AuthService {
         }),
       );
 
+      print('Rejestracja Status: ${response.statusCode}');
+      
       if (response.statusCode == 200 || response.statusCode == 201) {
         print('Rejestracja udana: ${response.body}');
         return true;
@@ -37,13 +40,14 @@ class AuthService {
         return false;
       }
     } catch (e) {
-      print('Błąd połączenia: $e');
+      print('Błąd połączenia (register): $e');
       return false;
     }
   }
 
   Future<bool> login(String email, String password) async {
     final url = Uri.parse('$_baseUrl/auth/login');
+    print('Logowanie - wysyłam do: $url');
 
     try {
       final response = await http.post(
@@ -55,21 +59,29 @@ class AuthService {
         }),
       );
 
+      print('Logowanie Status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         
-        String token = data['token'];
+        print('Odpowiedź serwera: $data');
 
-        await _storage.write(key: 'auth_token', value: token);
-        
-        print('Zalogowano pomyślnie.');
-        return true;
+        if (data['token'] != null) {
+          String token = data['token'];
+          await _storage.write(key: 'auth_token', value: token);
+          print('Zalogowano pomyślnie. Token zapisany.');
+          return true;
+        } else {
+          print('Błąd: Serwer nie zwrócił pola "token"!');
+          return false;
+        }
+
       } else {
         print('Błąd logowania: ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Błąd połączenia: $e');
+      print('Błąd połączenia (login): $e');
       return false;
     }
   }
