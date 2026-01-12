@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
-import '../services/auth_service.dart';
 import 'map_screen.dart';
 import 'activity_list_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const MapScreen(),
     const ActivityListScreen(),
-    const ProfilePlaceholder(),
+    const ProfileScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -52,45 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
             activeIcon: Icon(Icons.person),
             label: 'Profil',
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class ProfilePlaceholder extends StatelessWidget {
-  const ProfilePlaceholder({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.account_circle, size: 100, color: Colors.grey),
-          const SizedBox(height: 20),
-          const Text("Witaj użytkowniku!"),
-          const SizedBox(height: 40),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await authService.logout();
-              
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text("Wyloguj się"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[800],
-            ),
-          )
         ],
       ),
     );

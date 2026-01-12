@@ -21,19 +21,26 @@ class AuthService {
         url,
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: jsonEncode({
-          'firstname': firstname,
-          'lastname': lastname,
+          'first_name': firstname,
+          'last_name': lastname,
           'email': email,
           'password': password,
+          'password_confirmation': password,
         }),
       );
 
-      print('Rejestracja Status: ${response.statusCode}');
+print('Rejestracja Status: ${response.statusCode}');
       
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 201) {
         print('Rejestracja udana: ${response.body}');
+        final data = jsonDecode(response.body);
+        if (data['token'] != null) {
+           await _storage.write(key: 'auth_token', value: data['token']);
+        }
+        
         return true;
       } else {
         print('Błąd rejestracji: ${response.body}');
