@@ -23,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   User? _user;
   UserStats? _userStats;
   File? _avatarImage;
+  int _requestsCount = 0; 
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -43,16 +44,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     final userFuture = _userService.getUserProfile();
     final statsFuture = _userService.getUserStats(period: 'month');
+    final requestsFuture = _userService.getFriendRequests();
 
-    final results = await Future.wait([userFuture, statsFuture]);
+    final results = await Future.wait([userFuture, statsFuture, requestsFuture]);
     final user = results[0] as User?;
     final stats = results[1] as UserStats?;
+    final requests = results[2] as List<dynamic>; // Zmiana na dynamic lub FriendRequest
 
     if (user != null) {
       if (mounted) {
         setState(() {
           _user = user;
           _userStats = stats;
+          _requestsCount = requests.length;
           
           _firstNameController.text = user.firstName;
           _lastNameController.text = user.lastName;
@@ -200,13 +204,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.people),
+            icon: Badge(
+              isLabelVisible: _requestsCount > 0,
+              label: Text('$_requestsCount'),
+              child: const Icon(Icons.people),
+            ),
             tooltip: 'Znajomi',
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              await Navigator.push(
                 context, 
                 MaterialPageRoute(builder: (context) => const FriendsScreen())
               );
+              _loadData(); 
             },
           ),
           IconButton(

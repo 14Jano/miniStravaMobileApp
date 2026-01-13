@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
-import '../services/social_service.dart';
+import '../models/friend_request_model.dart';
+import '../services/user_service.dart';
 import 'user_search_screen.dart';
 
 class FriendsScreen extends StatefulWidget {
@@ -12,10 +13,10 @@ class FriendsScreen extends StatefulWidget {
 
 class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final SocialService _socialService = SocialService();
+  final UserService _userService = UserService();
 
   List<User> _friends = [];
-  List<User> _requests = [];
+  List<FriendRequest> _requests = [];
   bool _isLoading = true;
 
   @override
@@ -27,8 +28,8 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final friends = await _socialService.getFriends();
-    final requests = await _socialService.getFriendRequests();
+    final friends = await _userService.getFriends();
+    final requests = await _userService.getFriendRequests();
     
     if (mounted) {
       setState(() {
@@ -39,19 +40,23 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
     }
   }
 
-  void _acceptRequest(int userId) async {
-    final success = await _socialService.acceptInvite(userId);
-    if (success) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zaakceptowano!")));
-      _loadData();
+  void _acceptRequest(int requestId) async {
+    final error = await _userService.acceptFriendInvite(requestId);
+    if (error == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zaakceptowano!"), backgroundColor: Colors.green));
+      _loadData(); 
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
     }
   }
 
-  void _rejectRequest(int userId) async {
-    final success = await _socialService.rejectInvite(userId);
-    if (success) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Odrzucono.")));
-      _loadData();
+  void _rejectRequest(int requestId) async {
+    final error = await _userService.rejectFriendInvite(requestId);
+    if (error == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Odrzucono."), backgroundColor: Colors.orange));
+      _loadData(); 
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
     }
   }
 
@@ -103,8 +108,11 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
         final user = _friends[index];
         return ListTile(
           leading: CircleAvatar(
+            backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
             backgroundColor: Colors.grey[300],
-            child: Text(user.firstName.isNotEmpty ? user.firstName[0] : 'U', style: const TextStyle(color: Colors.black)),
+            child: user.avatarUrl == null 
+                ? Text(user.firstName.isNotEmpty ? user.firstName[0] : 'U', style: const TextStyle(color: Colors.black)) 
+                : null,
           ),
           title: Text(user.fullName),
           subtitle: Text(user.email),
@@ -120,23 +128,28 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
     return ListView.builder(
       itemCount: _requests.length,
       itemBuilder: (context, index) {
-        final user = _requests[index];
+        final request = _requests[index];
+        final user = request.sender; 
+
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+            leading: CircleAvatar(
+              backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+              child: user.avatarUrl == null ? const Icon(Icons.person) : null,
+            ),
             title: Text(user.fullName),
-            subtitle: const Text('Zaproszenie do znajomych'),
+            subtitle: Text('Zaproszenie wysłane: ${request.createdAt.substring(0, 10)}'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
-                  onPressed: () => _acceptRequest(user.id),
+                  onPressed: () => _acceptRequest(request.id),
                 ),
                 IconButton(
                   icon: const Icon(Icons.cancel, color: Colors.red, size: 32),
-                  onPressed: () => _rejectRequest(user.id),
+                  onPressed: () => _rejectRequest(request.id),
                 ),
               ],
             ),

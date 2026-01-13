@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
+import '../models/friend_request_model.dart';
 
 class UserService {
   static const String _baseUrl = 'https://strava.host358482.xce.pl/api';
@@ -21,7 +22,7 @@ class UserService {
         },
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         final body = jsonDecode(response.body);
         final data = body['data'] ?? body;
         return User.fromJson(data);
@@ -67,7 +68,7 @@ class UserService {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      return response.statusCode == 200;
+      return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
       return false;
     }
@@ -86,13 +87,153 @@ class UserService {
         },
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         final body = jsonDecode(response.body);
         return UserStats.fromJson(body);
       }
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  Future<List<User>> searchUsers(String query) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/users/search?search=$query');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> data = body['data'];
+        return data.map((json) => User.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> sendFriendInvite(int userId) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/friends/invite');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'user_id': userId}),
+      );
+
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<User>> getFriends() async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/friends');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> data = body['data'] ?? [];
+        return data.map((json) => User.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<FriendRequest>> getFriendRequests() async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/friends/requests');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> incoming = body['incoming'] ?? [];
+        return incoming.map((json) => FriendRequest.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<String?> acceptFriendInvite(int requestId) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/friends/$requestId/accept'); 
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({}),
+      );
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return null;
+      } else {
+        return 'Błąd ${response.statusCode}';
+      }
+    } catch (e) {
+      return 'Wyjątek: $e';
+    }
+  }
+
+  Future<String?> rejectFriendInvite(int requestId) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/friends/$requestId/reject');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({}),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return null;
+      } else {
+        return 'Błąd ${response.statusCode}';
+      }
+    } catch (e) {
+      return 'Wyjątek: $e';
     }
   }
 }
