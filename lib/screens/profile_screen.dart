@@ -72,7 +72,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50, 
+      maxWidth: 1024,   
+    );
 
     if (pickedFile != null) {
       setState(() {
@@ -102,9 +106,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       birthDate: _selectedBirthDate,
       weightKg: int.tryParse(_weightController.text),
       heightCm: int.tryParse(_heightController.text),
+      avatarUrl: _user!.avatarUrl,
+      createdAt: _user!.createdAt,
     );
 
-    final success = await _userService.updateUserProfile(updatedUser);
+    final success = await _userService.updateUserProfile(updatedUser, avatarFile: _avatarImage);
+
+    if (success) {
+      await _loadData();
+    }
 
     setState(() => _isLoading = false);
 
@@ -219,8 +229,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     backgroundColor: Colors.grey[200],
                     backgroundImage: _avatarImage != null 
                         ? FileImage(_avatarImage!) 
-                        : null,
-                    child: _avatarImage == null
+                        : (_user!.avatarUrl != null 
+                            ? NetworkImage(_user!.avatarUrl!) as ImageProvider
+                            : null),
+                    child: (_avatarImage == null && _user!.avatarUrl == null)
                         ? const Icon(Icons.person, size: 60, color: Colors.grey)
                         : null,
                   ),

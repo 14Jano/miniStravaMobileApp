@@ -162,7 +162,11 @@ class _MapScreenState extends State<MapScreen> {
             
             Future<void> pickImage() async {
               final picker = ImagePicker();
-              final picked = await picker.pickImage(source: ImageSource.gallery);
+              final picked = await picker.pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 50,
+                maxWidth: 1024,
+              );
               if (picked != null) {
                 setDialogState(() {
                   selectedImage = File(picked.path);
@@ -330,7 +334,6 @@ class _MapScreenState extends State<MapScreen> {
   String _formatPace() {
     if (_totalDistanceMeters == 0) return "-:--";
     
-    // Obliczamy ile minut zajmuje 1 km
     final double distKm = _totalDistanceMeters / 1000;
     final double totalMinutes = _durationSeconds / 60;
     final double pace = totalMinutes / distKm;
@@ -401,7 +404,6 @@ class _MapScreenState extends State<MapScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PIERWSZY RZĄD: CZAS I DYSTANS
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -424,7 +426,6 @@ class _MapScreenState extends State<MapScreen> {
                     
                     const Divider(height: 20),
 
-                    // DRUGI RZĄD: TEMPO I PRĘDKOŚĆ
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [

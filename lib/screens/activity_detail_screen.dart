@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/activity_model.dart';
 import '../services/activity_service.dart';
 import 'dart:io';
@@ -23,7 +24,32 @@ class ActivityDetailScreen extends StatefulWidget {
 
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   final ActivityService _activityService = ActivityService();
-  late Future<Activity?> _activityFuture;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  
+  Activity? _activity;
+  String? _authToken;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final results = await Future.wait([
+      _activityService.getActivityDetails(widget.activityId),
+      _storage.read(key: 'auth_token'),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        _activity = results[0] as Activity?;
+        _authToken = results[1] as String?;
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _exportGpx() async {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -60,12 +86,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         );
       }
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _activityFuture = _activityService.getActivityDetails(widget.activityId);
   }
   
   void _editTitle(Activity activity) {
@@ -105,9 +125,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Tytuł zmieniony!")),
                 );
-                setState(() {
-                  _activityFuture = _activityService.getActivityDetails(widget.activityId);
-                });
+                _loadData();
               } else if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Błąd edycji.")),
@@ -158,177 +176,172 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_activity == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Błąd')),
+        body: const Center(child: Text('Nie udało się pobrać aktywności.')),
+      );
+    }
+
+    final activity = _activity!;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
-          FutureBuilder<Activity?>(
-            future: _activityFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox();
-              
-              return Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.share, color: Colors.blue),
-                    tooltip: "Eksportuj GPX",
-                    onPressed: _exportGpx,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _editTitle(snapshot.data!),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: _deleteActivity,
-                  ),
-                ],
-              );
-            },
-          )
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.blue),
+            tooltip: "Eksportuj GPX",
+            onPressed: _exportGpx,
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _editTitle(activity),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: _deleteActivity,
+          ),
         ],
       ),
-      body: FutureBuilder<Activity?>(
-        future: _activityFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError || snapshot.data == null) {
-            return const Center(child: Text("Nie udało się pobrać szczegółów."));
-          }
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 300,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: activity.routePoints.isNotEmpty 
+                      ? activity.routePoints.first 
+                      : const LatLng(52.237, 21.017),
+                  initialZoom: 14.0,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.ministrava',
+                  ),
+                  if (activity.routePoints.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: activity.routePoints,
+                          strokeWidth: 4.0,
+                          color: const Color(0xFFFC4C02),
+                        ),
+                      ],
+                    ),
+                  if (activity.routePoints.isNotEmpty)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: activity.routePoints.first,
+                          child: const Icon(Icons.location_on, color: Colors.green, size: 30),
+                        ),
+                        Marker(
+                          point: activity.routePoints.last,
+                          child: const Icon(Icons.flag, color: Colors.red, size: 30),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
 
-          final activity = snapshot.data!;
-          
-          final LatLng initialCenter = activity.routePoints.isNotEmpty
-              ? activity.routePoints.first
-              : const LatLng(52.237, 21.017);
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.title,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  Text(activity.formattedDate, style: const TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 20),
+                  
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem("Dystans", "${activity.distanceKm.toStringAsFixed(2)} km"),
+                      _buildStatItem("Czas", activity.formattedDuration),
+                      _buildStatItem("Tempo", activity.formattedPace),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Center(child: _buildStatItem("Typ", activity.type.toUpperCase())),
+                  
+                  const Divider(height: 30),
 
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                
-                SizedBox(
-                  height: 300,
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: initialCenter,
-                      initialZoom: 14.0,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  if (activity.notes != null && activity.notes!.isNotEmpty) ...[
+                    const Text(
+                      "Notatka",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Text(
+                        activity.notes!,
+                        style: const TextStyle(fontSize: 16),
                       ),
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.ministrava',
-                      ),
-                      
-                      if (activity.routePoints.isNotEmpty)
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: activity.routePoints,
-                              strokeWidth: 4.0,
-                              color: const Color(0xFFFC4C02),
-                            ),
-                          ],
-                        ),
-                      
-                      if (activity.routePoints.isNotEmpty)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: activity.routePoints.first,
-                              child: const Icon(Icons.location_on, color: Colors.green, size: 30),
-                            ),
-                            Marker(
-                              point: activity.routePoints.last,
-                              child: const Icon(Icons.flag, color: Colors.red, size: 30),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
+                    const SizedBox(height: 20),
+                  ],
 
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        activity.title,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      Text(activity.formattedDate, style: const TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 20),
-                      
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatItem("Dystans", "${activity.distanceKm.toStringAsFixed(2)} km"),
-                          _buildStatItem("Czas", activity.formattedDuration),
-                          _buildStatItem("Tempo", activity.formattedPace),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      Center(child: _buildStatItem("Typ", activity.type.toUpperCase())),
-                      
-                      const Divider(height: 30),
-
-                      if (activity.notes != null && activity.notes!.isNotEmpty) ...[
-                        const Text(
-                          "Notatka",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Text(
-                            activity.notes!,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      if (activity.photoUrl != null && activity.photoUrl!.isNotEmpty) ...[
-                        const Text(
-                          "Zdjęcie",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            activity.photoUrl!,
+                  if (activity.photoUrl != null && activity.photoUrl!.isNotEmpty) ...[
+                    const Text(
+                      "Zdjęcie",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        activity.photoUrl!,
+                        headers: _authToken != null 
+                            ? {'Authorization': 'Bearer $_authToken'} 
+                            : null,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
                             width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                color: Colors.grey[200],
-                                child: const Center(child: Text("Błąd ładowania zdjęcia")),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+                            color: Colors.grey[200],
+                            padding: const EdgeInsets.all(8.0),
+                            child: Center(
+                              child: Text(
+                                "Błąd ładowania: ${activity.photoUrl}\nSprawdź połączenie lub uprawnienia.",
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 12, color: Colors.red),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ],
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

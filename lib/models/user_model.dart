@@ -7,6 +7,9 @@ class User {
   final DateTime? birthDate;
   final int? weightKg;
   final int? heightCm;
+  final String? bio;
+  final String? avatarUrl;
+  final DateTime? createdAt;
 
   User({
     required this.id,
@@ -17,6 +20,9 @@ class User {
     this.birthDate,
     this.weightKg,
     this.heightCm,
+    this.bio,
+    this.avatarUrl,
+    this.createdAt,
   });
 
   String get fullName => '$firstName $lastName';
@@ -46,6 +52,11 @@ class User {
           : null,
       weightKg: parseIntNullable(json['weight_kg']),
       heightCm: parseIntNullable(json['height_cm']),
+      bio: json['bio']?.toString(),
+      avatarUrl: json['avatar_url']?.toString(),
+      createdAt: json['created_at'] != null 
+          ? DateTime.tryParse(json['created_at'].toString()) 
+          : null,
     );
   }
 
@@ -57,6 +68,7 @@ class User {
       'birth_date': birthDate?.toIso8601String().substring(0, 10),
       'weight_kg': weightKg,
       'height_cm': heightCm,
+      'bio': bio,
     };
   }
 }
@@ -90,7 +102,7 @@ class UserStats {
     }
 
     return UserStats(
-      period: json['period'] ?? '',
+      period: json['period']?.toString() ?? '',
       workouts: parseInt(json['workouts']),
       distanceKm: parseDouble(json['distance_km']),
       durationSeconds: parseInt(json['duration_seconds']),
