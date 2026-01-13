@@ -50,6 +50,8 @@ class Activity {
     
     final double paceDecimal = totalMinutes / distKm;
     
+    if (paceDecimal > 60) return ">60:00 /km";
+
     final int minutes = paceDecimal.floor();
     final int seconds = ((paceDecimal - minutes) * 60).round();
     
@@ -57,13 +59,19 @@ class Activity {
   }
 
   factory Activity.fromJson(Map<String, dynamic> json) {
-    List<LatLng> parseRoute(List<dynamic>? routeJson) {
-      if (routeJson == null) return [];
-      return routeJson.map((point) {
-        final lat = (point['lat'] is num) ? (point['lat'] as num).toDouble() : double.parse(point['lat'].toString());
-        final lng = (point['lng'] is num) ? (point['lng'] as num).toDouble() : double.parse(point['lng'].toString());
-        return LatLng(lat, lng);
-      }).toList();
+    List<LatLng> parseRoute(dynamic routeData) {
+      if (routeData == null) return [];
+      if (routeData is List) {
+        return routeData.map((point) {
+          if (point is Map<String, dynamic>) {
+            final lat = (point['lat'] is num) ? (point['lat'] as num).toDouble() : double.tryParse(point['lat'].toString()) ?? 0.0;
+            final lng = (point['lng'] is num) ? (point['lng'] as num).toDouble() : double.tryParse(point['lng'].toString()) ?? 0.0;
+            return LatLng(lat, lng);
+          }
+          return const LatLng(0, 0);
+        }).toList();
+      }
+      return [];
     }
 
     double parseDouble(dynamic value) {
@@ -83,17 +91,35 @@ class Activity {
       meters = parseDouble(json['distance_km']) * 1000;
     }
 
+    String? parsePhotoUrl(dynamic url) {
+      if (url == null) return null;
+      String path = url.toString();
+      if (path.isEmpty) return null;
+      
+      if (path.startsWith('http')) {
+        return path;
+      }
+      
+      const String baseUrl = 'https://strava.host358482.xce.pl';
+      
+      if (path.startsWith('/')) {
+        return '$baseUrl$path';
+      }
+      
+      return '$baseUrl/$path';
+    }
+
     return Activity(
       id: parseInt(json['id']),
-      title: json['title'] ?? 'Bez tytułu',
-      type: json['type'] ?? 'run',
-      startTime: DateTime.tryParse(json['start_time'] ?? '') ?? DateTime.now(),
-      endTime: DateTime.tryParse(json['end_time'] ?? '') ?? DateTime.now(),
+      title: json['title']?.toString() ?? 'Bez tytułu',
+      type: json['type']?.toString() ?? 'run',
+      startTime: DateTime.tryParse(json['start_time']?.toString() ?? '') ?? DateTime.now(),
+      endTime: DateTime.tryParse(json['end_time']?.toString() ?? '') ?? DateTime.now(),
       durationSeconds: parseInt(json['duration_seconds']),
       distanceMeters: meters,
       routePoints: parseRoute(json['route']),
-      notes: json['notes'],
-      photoUrl: json['photo_url'],
+      notes: json['notes']?.toString(),
+      photoUrl: parsePhotoUrl(json['photo_url']),
     );
   }
 }

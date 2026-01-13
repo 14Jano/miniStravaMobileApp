@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
@@ -16,63 +17,71 @@ class UserService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final data = body is Map<String, dynamic> && body.containsKey('data') 
-            ? body['data'] 
-            : body;
-            
+        final data = body['data'] ?? body;
         return User.fromJson(data);
-      } else {
-        return null;
       }
+      return null;
     } catch (e) {
       return null;
     }
   }
 
-  Future<bool> updateUserProfile(User user) async {
+  Future<bool> updateUserProfile(User user, {File? avatarFile}) async {
     final token = await _storage.read(key: 'auth_token');
     final url = Uri.parse('$_baseUrl/profile');
 
     try {
-      final response = await http.put(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(user.toJson()),
-      );
+      final request = http.MultipartRequest('POST', url);
       
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        return false;
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
+
+      request.fields['_method'] = 'PUT';
+
+      request.fields['first_name'] = user.firstName;
+      request.fields['last_name'] = user.lastName;
+      
+      if (user.gender != null) request.fields['gender'] = user.gender!;
+      if (user.birthDate != null) {
+        request.fields['birth_date'] = user.birthDate!.toIso8601String().split('T')[0];
       }
+      if (user.weightKg != null) request.fields['weight_kg'] = user.weightKg.toString();
+      if (user.heightCm != null) request.fields['height_cm'] = user.heightCm.toString();
+      if (user.bio != null) request.fields['bio'] = user.bio!;
+
+      if (avatarFile != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'avatar',
+          avatarFile.path,
+        ));
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      return response.statusCode == 200;
     } catch (e) {
       return false;
     }
   }
 
-  Future<UserStats?> getUserStats({String period = 'month'}) async {
+  Future<UserStats?> getUserStats({String period = 'week'}) async {
     final token = await _storage.read(key: 'auth_token');
-    final url = Uri.parse('$_baseUrl/stats/me').replace(queryParameters: {
-      'period': period,
-    });
+    final url = Uri.parse('$_baseUrl/stats/me?period=$period');
 
     try {
       final response = await http.get(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
@@ -80,9 +89,8 @@ class UserService {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         return UserStats.fromJson(body);
-      } else {
-        return null;
       }
+      return null;
     } catch (e) {
       return null;
     }

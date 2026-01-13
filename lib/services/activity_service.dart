@@ -33,12 +33,10 @@ class ActivityService {
           return [];
         }
       } else {
-        print('Błąd pobierania: ${response.statusCode} ${response.body}');
-        throw Exception('Nie udało się pobrać treningów');
+        return [];
       }
     } catch (e) {
-      print('Błąd serwisu: $e');
-      rethrow;
+      return [];
     }
   }
 
@@ -63,7 +61,6 @@ class ActivityService {
 
     try {
       if (imageFile == null) {
-        // --- Wersja bez zdjęcia (zwykły JSON) ---
         final response = await http.post(
           url,
           headers: {
@@ -76,7 +73,7 @@ class ActivityService {
             'start_time': startTime.toIso8601String(),
             'end_time': endTime.toIso8601String(),
             'duration_seconds': durationSeconds,
-            'distance_meters': distanceMeters,
+            'distance_meters': distanceMeters.toInt(),
             'route': routeJson,
             'notes': notes,
           }),
@@ -84,40 +81,36 @@ class ActivityService {
         return (response.statusCode == 200 || response.statusCode == 201);
 
       } else {
-        // --- Wersja ze zdjęciem (Multipart) ---
         var request = http.MultipartRequest('POST', url);
-        request.headers['Authorization'] = 'Bearer $token';
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        });
         
         request.fields['title'] = title;
         request.fields['type'] = type;
         request.fields['start_time'] = startTime.toIso8601String();
         request.fields['end_time'] = endTime.toIso8601String();
         request.fields['duration_seconds'] = durationSeconds.toString();
-        request.fields['distance_meters'] = distanceMeters.toString();
+        request.fields['distance_meters'] = distanceMeters.toInt().toString();
         if (notes != null) request.fields['notes'] = notes;
         
-        // Ważne: Przesyłamy tablicę route jako string JSON,
-        // backend musi to obsłużyć (zdekodować) lub przyjąć w takiej formie.
-        request.fields['route'] = jsonEncode(routeJson);
+        for (int i = 0; i < routePoints.length; i++) {
+          request.fields['route[$i][lat]'] = routePoints[i].latitude.toString();
+          request.fields['route[$i][lng]'] = routePoints[i].longitude.toString();
+        }
 
         request.files.add(await http.MultipartFile.fromPath(
-          'photo', // Nazwa pola pliku (może wymagać zmiany na 'image' lub 'file' w zależności od API)
+          'photo',
           imageFile.path,
         ));
 
         var streamedResponse = await request.send();
         var response = await http.Response.fromStream(streamedResponse);
 
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          print('Trening ze zdjęciem zapisany!');
-          return true;
-        } else {
-          print('Błąd uploadu: ${response.body}');
-          return false;
-        }
+        return (response.statusCode == 200 || response.statusCode == 201);
       }
     } catch (e) {
-      print('Błąd połączenia: $e');
       return false;
     }
   }
@@ -144,11 +137,9 @@ class ActivityService {
            return Activity.fromJson(body);
         }
       } else {
-        print('Błąd pobierania szczegółów: ${response.statusCode} ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Błąd połączenia: $e');
       return null;
     }
   }
@@ -157,7 +148,6 @@ class ActivityService {
     final token = await _storage.read(key: 'auth_token');
     final url = Uri.parse('$_baseUrl/activities/${activity.id}');
 
-   
     final routeJson = activity.routePoints.map((point) => {
       'lat': point.latitude,
       'lng': point.longitude,
@@ -173,25 +163,17 @@ class ActivityService {
         body: jsonEncode({
           'title': activity.title,
           'type': activity.type,
-          'start_time': activity.startTime.toIso8601String().substring(0, 19),
-          'end_time': activity.endTime.toIso8601String().substring(0, 19),
+          'start_time': activity.startTime.toIso8601String(),
+          'end_time': activity.endTime.toIso8601String(),
           'duration_seconds': activity.durationSeconds,
-          'distance_meters': activity.distanceMeters,
+          'distance_meters': activity.distanceMeters.toInt(),
           'route': routeJson,
-          'photo_url': "",
-          'gpx_path': "",
+          'notes': activity.notes, 
         }),
       );
 
-      if (response.statusCode == 200) {
-        print('Trening zaktualizowany!');
-        return true;
-      } else {
-        print('Błąd aktualizacji: ${response.body}');
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print('Błąd połączenia: $e');
       return false;
     }
   }
@@ -209,15 +191,8 @@ class ActivityService {
         },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        print('Trening usunięty!');
-        return true;
-      } else {
-        print('Błąd usuwania: ${response.body}');
-        return false;
-      }
+      return (response.statusCode == 200 || response.statusCode == 204);
     } catch (e) {
-      print('Błąd połączenia: $e');
       return false;
     }
   }
@@ -236,15 +211,10 @@ class ActivityService {
 
       if (response.statusCode == 200) {
         return response.body;
-      } else if (response.statusCode == 404) {
-        print('Brak trasy do wyeksportowania (404)');
-        return null;
       } else {
-        print('Błąd eksportu: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Błąd połączenia: $e');
       return null;
     }
   }
