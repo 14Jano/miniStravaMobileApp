@@ -110,3 +110,40 @@ class UserStats {
     );
   }
 }
+
+class RankingEntry {
+  final int position;
+  final int userId;
+  final String name;
+  final String? avatarUrl;
+  final double distanceKm;
+  final int workouts;
+
+  RankingEntry({
+    required this.position,
+    required this.userId,
+    required this.name,
+    this.avatarUrl,
+    required this.distanceKm,
+    required this.workouts,
+  });
+
+  factory RankingEntry.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? 0.0;
+    }
+
+    final userData = json['user'] ?? {};
+
+    return RankingEntry(
+      position: json['position'] ?? 0,
+      userId: json['user_id'] ?? 0,
+      name: userData['name'] ?? 'Użytkownik',
+      avatarUrl: userData['avatar_url'],
+      distanceKm: parseDouble(json['distance_km']),
+      workouts: json['workouts'] ?? 0,
+    );
+  }
+}

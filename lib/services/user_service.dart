@@ -236,4 +236,119 @@ class UserService {
       return 'Wyjątek: $e';
     }
   }
+
+  Future<List<RankingEntry>> getRanking(String period) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/stats/ranking?period=$period');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> ranking = body['ranking'] ?? [];
+        return ranking.map((json) => RankingEntry.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<User>> getBlockedUsers() async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/blocks');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> data = body['data'] ?? [];
+        return data.map((json) => User.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> blockUser(int userId) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/blocks');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'user_id': userId}),
+      );
+
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> unblockUser(int userId) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/blocks/$userId');
+
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> reportAbuse({
+    required String type, 
+    required int targetId,
+    required String reason,
+  }) async {
+    final token = await _storage.read(key: 'auth_token');
+    final url = Uri.parse('$_baseUrl/reports');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'type': type,
+          'target_id': targetId,
+          'reason': reason,
+        }),
+      );
+
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      return false;
+    }
+  }
 }
