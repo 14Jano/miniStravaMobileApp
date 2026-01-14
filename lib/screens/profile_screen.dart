@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
 import '../services/auth_service.dart';
@@ -18,9 +19,13 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final UserService _userService = UserService();
   final AuthService _authService = AuthService();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final _formKey = GlobalKey<FormState>();
 
   bool _isLoading = true;
+  bool _isGuest = false; 
+  bool _hasError = false;
+  
   User? _user;
   UserStats? _userStats;
   File? _avatarImage;
@@ -37,40 +42,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _checkModeAndLoad();
+  }
+
+  Future<void> _checkModeAndLoad() async {
+    final token = await _storage.read(key: 'auth_token');
+    
+    if (token == null) {
+      setState(() {
+        _isGuest = true;
+        _isLoading = false;
+      });
+    } else {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     
-    final userFuture = _userService.getUserProfile();
-    final statsFuture = _userService.getUserStats(period: 'month');
-    final requestsFuture = _userService.getFriendRequests();
+    try {
+      final userFuture = _userService.getUserProfile();
+      final statsFuture = _userService.getUserStats(period: 'month');
+      final requestsFuture = _userService.getFriendRequests();
 
-    final results = await Future.wait([userFuture, statsFuture, requestsFuture]);
-    final user = results[0] as User?;
-    final stats = results[1] as UserStats?;
-    final requests = results[2] as List<dynamic>;
+      final results = await Future.wait([userFuture, statsFuture, requestsFuture]);
+      final user = results[0] as User?;
+      final stats = results[1] as UserStats?;
+      final requests = results[2] as List<dynamic>;
 
-    if (user != null) {
+      if (user != null) {
+        if (mounted) {
+          setState(() {
+            _user = user;
+            _userStats = stats;
+            _requestsCount = requests.length;
+            
+            _firstNameController.text = user.firstName;
+            _lastNameController.text = user.lastName;
+            _weightController.text = user.weightKg != null && user.weightKg! > 0 ? user.weightKg.toString() : '';
+            _heightController.text = user.heightCm != null && user.heightCm! > 0 ? user.heightCm.toString() : '';
+            _selectedGender = user.gender;
+            _selectedBirthDate = user.birthDate;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _hasError = true);
+      }
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _user = user;
-          _userStats = stats;
-          _requestsCount = requests.length;
-          
-          _firstNameController.text = user.firstName;
-          _lastNameController.text = user.lastName;
-          _weightController.text = user.weightKg != null && user.weightKg! > 0 ? user.weightKg.toString() : '';
-          _heightController.text = user.heightCm != null && user.heightCm! > 0 ? user.heightCm.toString() : '';
-          _selectedGender = user.gender;
-          _selectedBirthDate = user.birthDate;
+          _hasError = true;
           _isLoading = false;
         });
-      }
-    } else {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
@@ -191,6 +219,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isGuest || _hasError) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Mój Profil'),
+          automaticallyImplyLeading: false,
+          actions: _isGuest ? [] : [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+              tooltip: 'Wyloguj',
+            )
+          ],
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(_isGuest ? Icons.person_outline : Icons.wifi_off, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                _isGuest ? 'Tryb Gościa' : 'Błąd połączenia',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _isGuest 
+                    ? 'Zaloguj się, aby zsynchronizować swoje treningi i edytować profil.' 
+                    : 'Profil dostępny po zalogowaniu online', 
+                textAlign: TextAlign.center
+              ),
+              const SizedBox(height: 24),
+              
+              if (_isGuest)
+                ElevatedButton(
+                  onPressed: _logout, // To przekieruje do LoginScreen
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFC4C02),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  ),
+                  child: const Text('ZALOGUJ SIĘ', style: TextStyle(color: Colors.white)),
+                ),
+
+              if (_hasError && !_isGuest)
+                TextButton(onPressed: _loadData, child: const Text("Spróbuj ponownie"))
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }

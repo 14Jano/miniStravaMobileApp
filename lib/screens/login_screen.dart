@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/auth_service.dart';
+import '../services/activity_service.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
@@ -15,6 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final ActivityService _activityService = ActivityService(); 
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   bool _isLoading = false;
 
   void _handleLogin() async {
@@ -23,19 +27,48 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailController.text,
       _passwordController.text,
     );
-    setState(() => _isLoading = false);
 
-    if (success && mounted) {
+    if (success) {
+      await _storage.delete(key: 'is_offline'); 
+      
+      final syncedCount = await _activityService.syncPendingActivities();
+      
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        String message = 'Zalogowano pomyślnie!';
+        if (syncedCount > 0) {
+          message += ' Zsynchronizowano $syncedCount treningów lokalnych.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.green),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+    } else {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nieprawidłowy email lub hasło, lub brak internetu.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _handleOfflineMode() async {
+    await _storage.write(key: 'is_offline', value: 'true');
+
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Zalogowano pomyślnie!'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Wchodzisz jako Gość (Offline). Twoje treningi zapiszą się lokalnie.'), backgroundColor: Colors.orange),
       );
       Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nieprawidłowy email lub hasło.'), backgroundColor: Colors.red),
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     }
   }
@@ -115,6 +148,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _handleLogin,
                         child: const Text('ZALOGUJ SIĘ'),
                       ),
+
+                const SizedBox(height: 15),
+                
+                OutlinedButton(
+                  onPressed: _handleOfflineMode,
+                  child: const Text('KORZYSTAJ JAKO GOŚĆ (OFFLINE)'),
+                ),
 
                 const SizedBox(height: 20),
 

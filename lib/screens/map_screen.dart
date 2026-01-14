@@ -56,6 +56,8 @@ class _MapScreenState extends State<MapScreen> {
       if (permission == LocationPermission.denied) return;
     }
 
+    if (permission == LocationPermission.deniedForever) return;
+
     Position position = await Geolocator.getCurrentPosition();
     if (mounted) {
       setState(() {
@@ -90,30 +92,57 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _startLocationStream() {
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 3, 
-    );
+    late LocationSettings locationSettings;
+
+    if (Platform.isAndroid) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 3,
+        forceLocationManager: true,
+        intervalDuration: const Duration(seconds: 2),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: "Mini Strava",
+          notificationText: "Trwa rejestrowanie trasy w tle...",
+          notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+          enableWifiLock: true,
+        ),
+      );
+    } else if (Platform.isIOS || Platform.isMacOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.fitness,
+        distanceFilter: 3,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 3,
+      );
+    }
 
     _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings)
         .listen((Position position) {
       final newPoint = LatLng(position.latitude, position.longitude);
 
       setState(() {
-        if (_routePoints.isNotEmpty) {
-          final distance = Geolocator.distanceBetween(
-            _routePoints.last.latitude, _routePoints.last.longitude,
-            newPoint.latitude, newPoint.longitude,
-          );
-          _totalDistanceMeters += distance;
+        if (!_isPaused) {
+          if (_routePoints.isNotEmpty) {
+            final distance = Geolocator.distanceBetween(
+              _routePoints.last.latitude, _routePoints.last.longitude,
+              newPoint.latitude, newPoint.longitude,
+            );
+            _totalDistanceMeters += distance;
+          }
+
+          double speedMps = position.speed; 
+          if (speedMps < 0) speedMps = 0;
+          _currentSpeedKmh = speedMps * 3.6; 
+
+          _routePoints.add(newPoint);
         }
-
-        double speedMps = position.speed; 
-        if (speedMps < 0) speedMps = 0;
-        _currentSpeedKmh = speedMps * 3.6; 
-
         _currentPosition = newPoint;
-        _routePoints.add(newPoint);
       });
       
       _mapController.move(newPoint, 17.0);
@@ -126,7 +155,6 @@ class _MapScreenState extends State<MapScreen> {
       _currentSpeedKmh = 0.0; 
     });
     _timer?.cancel();
-    _positionStream?.pause();
   }
 
   void _resumeRecording() {
@@ -134,12 +162,12 @@ class _MapScreenState extends State<MapScreen> {
       _isPaused = false;
     });
     _startTimer();
-    _positionStream?.resume();
   }
 
   void _stopRecording() async {
-    _positionStream?.pause();
+    await _positionStream?.cancel();
     _timer?.cancel();
+    
     setState(() {
       _isRecording = false;
       _isPaused = false;
@@ -152,6 +180,8 @@ class _MapScreenState extends State<MapScreen> {
     
     String selectedType = 'run';
     File? selectedImage;
+
+    if (!mounted) return;
 
     await showDialog(
       context: context,
