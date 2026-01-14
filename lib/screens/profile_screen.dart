@@ -23,7 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   bool _isLoading = true;
-  bool _isOffline = false;
+  bool _isGuest = false; 
   bool _hasError = false;
   
   User? _user;
@@ -46,10 +46,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _checkModeAndLoad() async {
-    final offline = await _storage.read(key: 'is_offline');
-    if (offline == 'true') {
+    final token = await _storage.read(key: 'auth_token');
+    
+    if (token == null) {
       setState(() {
-        _isOffline = true;
+        _isGuest = true;
         _isLoading = false;
       });
     } else {
@@ -218,12 +219,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isOffline || _hasError) {
+    if (_isGuest || _hasError) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Mój Profil'),
           automaticallyImplyLeading: false,
-          actions: _isOffline ? [] : [ // Ukryj ikonę wylogowania jeśli offline
+          actions: _isGuest ? [] : [
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: _logout,
@@ -235,24 +236,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(_isOffline ? Icons.person_off : Icons.wifi_off, size: 64, color: Colors.grey),
+              Icon(_isGuest ? Icons.person_outline : Icons.wifi_off, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
               Text(
-                _isOffline ? 'Tryb Offline' : 'Błąd połączenia',
+                _isGuest ? 'Tryb Gościa' : 'Błąd połączenia',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
               ),
               const SizedBox(height: 8),
               Text(
-                _isOffline 
-                    ? 'Funkcje profilowe są dostępne tylko online.' 
+                _isGuest 
+                    ? 'Zaloguj się, aby zsynchronizować swoje treningi i edytować profil.' 
                     : 'Profil dostępny po zalogowaniu online', 
                 textAlign: TextAlign.center
               ),
               const SizedBox(height: 24),
               
-              if (_isOffline)
+              if (_isGuest)
                 ElevatedButton(
-                  onPressed: _logout,
+                  onPressed: _logout, // To przekieruje do LoginScreen
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFC4C02),
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
@@ -260,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: const Text('ZALOGUJ SIĘ', style: TextStyle(color: Colors.white)),
                 ),
 
-              if (_hasError && !_isOffline)
+              if (_hasError && !_isGuest)
                 TextButton(onPressed: _loadData, child: const Text("Spróbuj ponownie"))
             ],
           ),

@@ -13,12 +13,11 @@ class ActivityService {
 
   Future<List<Activity>> getActivities() async {
     final token = await _storage.read(key: 'auth_token');
-    final isOffline = await _storage.read(key: 'is_offline') == 'true';
     
-    List<Activity> serverActivities = [];
     List<Activity> localActivities = await _getLocalPendingAsActivities();
+    List<Activity> serverActivities = [];
 
-    if (!isOffline) {
+    if (token != null) {
       final url = Uri.parse('$_baseUrl/activities');
       try {
         final response = await http.get(
@@ -63,7 +62,7 @@ class ActivityService {
         
         activities.add(Activity(
           id: -1 * DateTime.parse(item['start_time']).millisecondsSinceEpoch, 
-          title: item['title'] ?? 'Lokalna aktywność',
+          title: item['title'] ?? 'Lokalna aktywność (niezsynchronizowana)',
           type: item['type'] ?? 'run',
           startTime: DateTime.parse(item['start_time']),
           endTime: DateTime.parse(item['end_time']),
@@ -71,12 +70,11 @@ class ActivityService {
           distanceMeters: (item['distance_meters'] as num).toDouble(),
           routePoints: route,
           notes: item['notes'],
-          photoUrl: item['image_path'], 
+          photoUrl: item['image_path'],
         ));
       }
       return activities.reversed.toList();
     } catch (e) {
-      print('Błąd odczytu lokalnych aktywności: $e');
       return [];
     }
   }
@@ -93,9 +91,8 @@ class ActivityService {
     File? imageFile,
   }) async {
     final token = await _storage.read(key: 'auth_token');
-    final isOffline = await _storage.read(key: 'is_offline') == 'true';
     
-    if (isOffline) {
+    if (token == null) {
       await _savePendingActivity(
         title: title,
         type: type,
@@ -234,6 +231,9 @@ class ActivityService {
   }
 
   Future<int> syncPendingActivities() async {
+    final token = await _storage.read(key: 'auth_token');
+    if (token == null) return 0;
+
     try {
       final directory = await getApplicationDocumentsDirectory();
       final file = File('${directory.path}/$_pendingFile');
@@ -287,7 +287,6 @@ class ActivityService {
 
       return syncedCount;
     } catch (e) {
-      print('Błąd synchronizacji: $e');
       return 0;
     }
   }
@@ -367,105 +366,50 @@ class ActivityService {
 
   Future<Activity?> getActivityDetails(int id) async {
     final token = await _storage.read(key: 'auth_token');
+    if (token == null) return null;
     final url = Uri.parse('$_baseUrl/activities/$id');
-
     try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
+      final response = await http.get(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'});
       if (response.statusCode == 200) {
         final dynamic body = jsonDecode(response.body);
-        
-        if (body is Map<String, dynamic> && body.containsKey('data')) {
-           return Activity.fromJson(body['data']);
-        } else {
-           return Activity.fromJson(body);
-        }
-      } else {
-        return null;
+        if (body is Map<String, dynamic> && body.containsKey('data')) return Activity.fromJson(body['data']);
+        else return Activity.fromJson(body);
       }
-    } catch (e) {
       return null;
-    }
+    } catch (e) { return null; }
   }
 
   Future<bool> updateActivity(Activity activity) async {
     final token = await _storage.read(key: 'auth_token');
+    if (token == null) return false;
     final url = Uri.parse('$_baseUrl/activities/${activity.id}');
-
-    final routeJson = activity.routePoints.map((point) => {
-      'lat': point.latitude,
-      'lng': point.longitude,
-    }).toList();
-
+    final routeJson = activity.routePoints.map((point) => {'lat': point.latitude, 'lng': point.longitude}).toList();
     try {
-      final response = await http.put(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'title': activity.title,
-          'type': activity.type,
-          'start_time': activity.startTime.toIso8601String(),
-          'end_time': activity.endTime.toIso8601String(),
-          'duration_seconds': activity.durationSeconds,
-          'distance_meters': activity.distanceMeters.toInt(),
-          'route': routeJson,
-          'notes': activity.notes, 
-        }),
-      );
-
+      final response = await http.put(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'}, body: jsonEncode({
+          'title': activity.title, 'type': activity.type, 'start_time': activity.startTime.toIso8601String(), 'end_time': activity.endTime.toIso8601String(), 'duration_seconds': activity.durationSeconds, 'distance_meters': activity.distanceMeters.toInt(), 'route': routeJson, 'notes': activity.notes, 
+        }));
       return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
 
   Future<bool> deleteActivity(int id) async {
     final token = await _storage.read(key: 'auth_token');
+    if (token == null) return false;
     final url = Uri.parse('$_baseUrl/activities/$id');
-
     try {
-      final response = await http.delete(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
+      final response = await http.delete(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'});
       return (response.statusCode == 200 || response.statusCode == 204);
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
 
   Future<String?> exportGpx(int id) async {
     final token = await _storage.read(key: 'auth_token');
+    if (token == null) return null;
     final url = Uri.parse('$_baseUrl/activities/$id/export.gpx');
-
     try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return response.body;
-      } else {
-        return null;
-      }
-    } catch (e) {
+      final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+      if (response.statusCode == 200) return response.body;
       return null;
-    }
+    } catch (e) { return null; }
   }
 }
