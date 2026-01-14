@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -15,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   bool _isLoading = false;
 
   void _handleLogin() async {
@@ -26,17 +28,43 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (success && mounted) {
+      await _storage.write(key: 'is_offline', value: 'false');
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Zalogowano pomyślnie!'), backgroundColor: Colors.green),
       );
       Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nieprawidłowy email lub hasło.'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Nieprawidłowy email lub hasło, lub brak internetu.'), backgroundColor: Colors.red),
       );
+    }
+  }
+
+  void _handleOfflineMode() async {
+    final token = await _storage.read(key: 'auth_token');
+    
+    if (token != null) {
+      await _storage.write(key: 'is_offline', value: 'true');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tryb Offline włączony.'), backgroundColor: Colors.orange),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Musisz zalogować się chociaż raz online, aby używać trybu offline.'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -115,6 +143,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _handleLogin,
                         child: const Text('ZALOGUJ SIĘ'),
                       ),
+
+                const SizedBox(height: 15),
+                
+                OutlinedButton(
+                  onPressed: _handleOfflineMode,
+                  child: const Text('TRYB OFFLINE'),
+                ),
 
                 const SizedBox(height: 20),
 

@@ -4,6 +4,7 @@ import 'activity_list_screen.dart';
 import 'profile_screen.dart';
 import 'feed_screen.dart';
 import 'ranking_screen.dart';
+import '../services/activity_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,6 +15,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  final ActivityService _activityService = ActivityService();
 
   final List<Widget> _screens = [
     const FeedScreen(),
@@ -22,6 +24,21 @@ class _HomeScreenState extends State<HomeScreen> {
     const RankingScreen(),
     const ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _trySync();
+  }
+
+  Future<void> _trySync() async {
+    final syncedCount = await _activityService.syncPendingActivities();
+    if (syncedCount > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Zsynchronizowano $syncedCount treningów!'), backgroundColor: Colors.green),
+      );
+    }
+  }
 
   void _onTabTapped(int index) {
     setState(() {
