@@ -3,6 +3,7 @@ import 'map_screen.dart';
 import 'activity_list_screen.dart';
 import 'profile_screen.dart';
 import 'feed_screen.dart';
+import 'ranking_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const FeedScreen(),
     const MapScreen(),
     const ActivityListScreen(),
+    const RankingScreen(),
     const ProfileScreen(),
   ];
 
@@ -37,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedItemColor: const Color(0xFFFC4C02),
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -52,6 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.history_outlined),
             activeIcon: Icon(Icons.history),
             label: 'Aktywności',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.leaderboard_outlined),
+            activeIcon: Icon(Icons.leaderboard),
+            label: 'Ranking',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

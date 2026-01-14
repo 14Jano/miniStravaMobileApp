@@ -6,6 +6,7 @@ import '../services/user_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'friends_screen.dart';
+import 'blocked_users_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -49,7 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final results = await Future.wait([userFuture, statsFuture, requestsFuture]);
     final user = results[0] as User?;
     final stats = results[1] as UserStats?;
-    final requests = results[2] as List<dynamic>; // Zmiana na dynamic lub FriendRequest
+    final requests = results[2] as List<dynamic>;
 
     if (user != null) {
       if (mounted) {
@@ -203,6 +204,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Mój Profil'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.block),
+            tooltip: 'Zablokowani',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BlockedUsersScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: Badge(
               isLabelVisible: _requestsCount > 0,

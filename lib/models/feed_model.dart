@@ -1,16 +1,25 @@
 class FeedUser {
+  final int id;
   final String firstName;
   final String lastName;
   final String? avatarUrl;
 
   FeedUser({
+    required this.id,
     required this.firstName,
     required this.lastName,
     this.avatarUrl,
   });
 
   factory FeedUser.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      return int.tryParse(value.toString()) ?? 0;
+    }
+
     return FeedUser(
+      id: parseInt(json['id']), 
       firstName: json['first_name'] ?? 'Użytkownik',
       lastName: json['last_name'] ?? '',
       avatarUrl: json['avatar_url'],
