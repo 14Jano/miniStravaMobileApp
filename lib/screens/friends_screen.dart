@@ -61,6 +61,12 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -139,7 +145,9 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
               child: user.avatarUrl == null ? const Icon(Icons.person) : null,
             ),
             title: Text(user.fullName),
-            subtitle: Text('Zaproszenie wysłane: ${request.createdAt.substring(0, 10)}'),
+            subtitle: Text(
+              'Zaproszenie wysłane: ${request.createdAt.length >= 10 ? request.createdAt.substring(0, 10) : request.createdAt}',
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -193,6 +193,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '${hours}h ${minutes}m';
   }
 
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
+    super.dispose();
+  }
+
   Widget _buildStatCard(String label, String value, IconData icon) {
     return Card(
       elevation: 2,

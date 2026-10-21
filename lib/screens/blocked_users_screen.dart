@@ -65,7 +65,9 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
-                        child: user.avatarUrl == null ? Text(user.firstName[0]) : null,
+                        child: user.avatarUrl == null
+                            ? Text(user.firstName.isNotEmpty ? user.firstName[0] : '?')
+                            : null,
                       ),
                       title: Text(user.fullName),
                       subtitle: Text(user.email),
