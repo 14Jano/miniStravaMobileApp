@@ -53,6 +53,18 @@ class FeedItem {
   });
 
   factory FeedItem.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? 0.0;
+    }
+
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      return int.tryParse(value.toString()) ?? 0;
+    }
+
     String formatDuration(int seconds) {
       final int minutes = (seconds / 60).floor();
       final int remainingSeconds = seconds % 60;
@@ -70,10 +82,10 @@ class FeedItem {
       title: json['title'] ?? 'Bez tytułu',
       type: json['type'] ?? 'activity',
       startTime: formatDate(json['start_time']),
-      distanceKm: (json['distance_km'] ?? 0).toDouble(), 
-      duration: formatDuration(json['duration_seconds'] ?? 0),
-      kudosCount: json['kudos_count'] ?? 0,
-      commentsCount: json['comments_count'] ?? 0,
+      distanceKm: parseDouble(json['distance_km']),
+      duration: formatDuration(parseInt(json['duration_seconds'])),
+      kudosCount: parseInt(json['kudos_count']),
+      commentsCount: parseInt(json['comments_count']),
       likedByMe: json['liked_by_me'] ?? false,
     );
   }
