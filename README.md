@@ -94,3 +94,11 @@ Uruchom testy poleceniem:
 ```bash
 flutter test
 ```
+
+## Autorzy
+
+**Jan Łabaj** – [@14Jano](https://github.com/14Jano)
+**Dominik Kamiński** - [@Lothander](https://github.com/Lothander)
+**Krystian Raczyński** - [@KRacz0](https://github.com/KRacz0)
+
+Praca inżynierska, Collegium Witelona Uczelnia Państwowa, 2026.
